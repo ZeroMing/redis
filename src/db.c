@@ -159,6 +159,7 @@ robj *lookupKeyWrite(redisDb *db, robj *key) {
     return lookupKey(db,key,LOOKUP_NONE);
 }
 
+// ### 查找Key
 robj *lookupKeyReadOrReply(client *c, robj *key, robj *reply) {
     robj *o = lookupKeyRead(c->db, key);
     if (!o) addReply(c,reply);

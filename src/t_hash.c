@@ -46,7 +46,8 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
         if (sdsEncodedObject(argv[i]) &&
             sdslen(argv[i]->ptr) > server.hash_max_ziplist_value)
         {
-            hashTypeConvert(o, OBJ_ENCODING_HT);
+        	// 将对象的编码转换成 REDIS_ENCODING_HT
+            hashTypeConverthashTypeConvert(o, OBJ_ENCODING_HT);
             break;
         }
     }
@@ -232,7 +233,8 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
                     ZIPLIST_TAIL);
         }
         o->ptr = zl;
-
+		
+		// 检查在添加操作完成之后，是否需要将 ZIPLIST 编码转换成 HT 编码
         /* Check if the ziplist needs to be converted to a hash table */
         if (hashTypeLength(o) > server.hash_max_ziplist_entries)
             hashTypeConvert(o, OBJ_ENCODING_HT);
@@ -535,8 +537,9 @@ void hsetCommand(client *c) {
         addReplyError(c,"wrong number of arguments for HMSET");
         return;
     }
-
+	// 取出或新创建哈希对象
     if ((o = hashTypeLookupWriteOrCreate(c,c->argv[1])) == NULL) return;
+	// 如果需要的话，转换哈希对象的编码
     hashTypeTryConversion(o,c->argv,2,c->argc-1);
 
     for (i = 2; i < c->argc; i += 2)
@@ -551,8 +554,11 @@ void hsetCommand(client *c) {
         /* HMSET */
         addReply(c, shared.ok);
     }
+	// 发送键修改信号
     signalModifiedKey(c->db,c->argv[1]);
+	// 发送事件通知
     notifyKeyspaceEvent(NOTIFY_HASH,"hset",c->argv[1],c->db->id);
+	// 将服务器设为脏
     server.dirty++;
 }
 

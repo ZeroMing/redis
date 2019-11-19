@@ -44,16 +44,21 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+/* 字典节点 */
 typedef struct dictEntry {
+    /* 键*/
     void *key;
+    /* 内容 */
     union {
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
     } v;
+    /* 链表，下一个节点 */
     struct dictEntry *next;
 } dictEntry;
+
 
 typedef struct dictType {
     uint64_t (*hashFunction)(const void *key);
@@ -65,7 +70,9 @@ typedef struct dictType {
 } dictType;
 
 /* This is our hash table structure. Every dictionary has two of this as we
- * implement incremental rehashing, for the old to the new table. */
+ * implement incremental rehashing, for the old to the new table.
+ * 每个字典都有两个哈希表结构。用来实现增长的再哈希，从旧的哈希表复制到新的哈希表
+ */
 typedef struct dictht {
     dictEntry **table;
     unsigned long size;

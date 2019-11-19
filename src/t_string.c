@@ -31,10 +31,11 @@
 #include <math.h> /* isnan(), isinf() */
 
 /*-----------------------------------------------------------------------------
- * String Commands
+ * String Commands 字符串命令
  *----------------------------------------------------------------------------*/
 
 static int checkStringLength(client *c, long long size) {
+    // 字符串的最大占用空间为 512M
     if (size > 512*1024*1024) {
         addReplyError(c,"string exceeds maximum allowed size (512MB)");
         return C_ERR;
@@ -83,8 +84,10 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
         addReply(c, abort_reply ? abort_reply : shared.null[c->resp]);
         return;
     }
+    // 真正入库操作
     setKey(c->db,key,val);
     server.dirty++;
+    // 处理过期时间
     if (expire) setExpire(c,c->db,key,mstime()+milliseconds);
     notifyKeyspaceEvent(NOTIFY_STRING,"set",key,c->db->id);
     if (expire) notifyKeyspaceEvent(NOTIFY_GENERIC,
@@ -92,7 +95,8 @@ void setGenericCommand(client *c, int flags, robj *key, robj *val, robj *expire,
     addReply(c, ok_reply ? ok_reply : shared.ok);
 }
 
-/* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>] */
+/* SET key value [NX] [XX] [EX <seconds>] [PX <milliseconds>]
+ * */
 void setCommand(client *c) {
     int j;
     robj *expire = NULL;
@@ -134,16 +138,19 @@ void setCommand(client *c) {
             return;
         }
     }
-
+    // 对 vaue 设置编码方式
     c->argv[2] = tryObjectEncoding(c->argv[2]);
+
     setGenericCommand(c,flags,c->argv[1],c->argv[2],expire,unit,NULL,NULL);
 }
 
+// ### SETNX
 void setnxCommand(client *c) {
     c->argv[2] = tryObjectEncoding(c->argv[2]);
     setGenericCommand(c,OBJ_SET_NX,c->argv[1],c->argv[2],NULL,0,shared.cone,shared.czero);
 }
 
+// ### SETEX
 void setexCommand(client *c) {
     c->argv[3] = tryObjectEncoding(c->argv[3]);
     setGenericCommand(c,OBJ_SET_NO_FLAGS,c->argv[1],c->argv[3],c->argv[2],UNIT_SECONDS,NULL,NULL);
@@ -156,10 +163,10 @@ void psetexCommand(client *c) {
 
 int getGenericCommand(client *c) {
     robj *o;
-
+    // 从数据库中查找
     if ((o = lookupKeyReadOrReply(c,c->argv[1],shared.null[c->resp])) == NULL)
         return C_OK;
-
+    // 检查类型
     if (o->type != OBJ_STRING) {
         addReply(c,shared.wrongtypeerr);
         return C_ERR;
@@ -430,11 +437,13 @@ void incrbyfloatCommand(client *c) {
     rewriteClientCommandArgument(c,2,new);
 }
 
+// ### 追加 APPEND
 void appendCommand(client *c) {
     size_t totlen;
     robj *o, *append;
-
+    // 从数据库中查询对应的 key
     o = lookupKeyWrite(c->db,c->argv[1]);
+    // 不存在key
     if (o == NULL) {
         /* Create the key */
         c->argv[2] = tryObjectEncoding(c->argv[2]);
@@ -449,6 +458,7 @@ void appendCommand(client *c) {
         /* "append" is an argument, so always an sds */
         append = c->argv[2];
         totlen = stringObjectLen(o)+sdslen(append->ptr);
+        // 检查总长度是否超过 512M
         if (checkStringLength(c,totlen) != C_OK)
             return;
 
@@ -463,8 +473,10 @@ void appendCommand(client *c) {
     addReplyLongLong(c,totlen);
 }
 
+// ### STRLEN 返回 key 所储存的字符串值的长度
 void strlenCommand(client *c) {
     robj *o;
+    // 从内存DB中查找Key对应的内容
     if ((o = lookupKeyReadOrReply(c,c->argv[1],shared.czero)) == NULL ||
         checkType(c,o,OBJ_STRING)) return;
     addReplyLongLong(c,stringObjectLen(o));

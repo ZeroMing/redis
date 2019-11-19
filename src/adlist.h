@@ -45,7 +45,9 @@ typedef struct listIter {
 } listIter;
 
 typedef struct list {
+    /* 头节点 */
     listNode *head;
+    /* 尾节点 */
     listNode *tail;
     void *(*dup)(void *ptr);
     void (*free)(void *ptr);

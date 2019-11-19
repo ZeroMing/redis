@@ -55,10 +55,10 @@ struct __attribute__ ((__packed__)) sdshdr8 {
     char buf[];
 };
 struct __attribute__ ((__packed__)) sdshdr16 {
-    uint16_t len; /* used */
-    uint16_t alloc; /* excluding the header and null terminator */
-    unsigned char flags; /* 3 lsb of type, 5 unused bits */
-    char buf[];
+    uint16_t len; /* used 字符串的长度 */
+    uint16_t alloc; /* excluding the header and null terminator 表示字符串的最大容量，不包含 header 和空的终止符 */
+    unsigned char flags; /* 3 lsb of type, 5 unused bitsheader的类型 */
+    char buf[]; /* 存放字符串的数组 */
 };
 struct __attribute__ ((__packed__)) sdshdr32 {
     uint32_t len; /* used */
@@ -84,10 +84,12 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
 
+// 返回指定长度的SDS
 static inline size_t sdslen(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
+            // 右移3位
             return SDS_TYPE_5_LEN(flags);
         case SDS_TYPE_8:
             return SDS_HDR(8,s)->len;
@@ -101,6 +103,7 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
+/* 计算存储字符串的数组剩余的长度。最大容量 - 字符长度 */
 static inline size_t sdsavail(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -126,13 +129,14 @@ static inline size_t sdsavail(const sds s) {
     }
     return 0;
 }
-
+/* 设置字符长度 */
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             {
                 unsigned char *fp = ((unsigned char*)s)-1;
+                // 左移3位，实际为 8
                 *fp = SDS_TYPE_5 | (newlen << SDS_TYPE_BITS);
             }
             break;

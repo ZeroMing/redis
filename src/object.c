@@ -26,6 +26,7 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ * 《《开源版权声明》》
  */
 
 #include "server.h"
@@ -39,9 +40,12 @@
 /* ===================== Creation and parsing of objects ==================== */
 
 robj *createObject(int type, void *ptr) {
+    // 只是申请对象头的空间。对象头与SDS的空间地址不一定连续
     robj *o = zmalloc(sizeof(*o));
     o->type = type;
+    // raw 存储形式
     o->encoding = OBJ_ENCODING_RAW;
+    // 指针指向SDS
     o->ptr = ptr;
     o->refcount = 1;
 
@@ -81,11 +85,14 @@ robj *createRawStringObject(const char *ptr, size_t len) {
 /* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
  * an object where the sds string is actually an unmodifiable string
  * allocated in the same chunk as the object itself. */
+// sds字符串实际上是一个不可修改的字符串,与对象本身在同一块中分配
 robj *createEmbeddedStringObject(const char *ptr, size_t len) {
+    // 一次性分配 对象头和SDS的空间
     robj *o = zmalloc(sizeof(robj)+sizeof(struct sdshdr8)+len+1);
     struct sdshdr8 *sh = (void*)(o+1);
 
     o->type = OBJ_STRING;
+    // embstr 存储格式
     o->encoding = OBJ_ENCODING_EMBSTR;
     o->ptr = sh+1;
     o->refcount = 1;
@@ -117,9 +124,11 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
  * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */
 #define OBJ_ENCODING_EMBSTR_SIZE_LIMIT 44
 robj *createStringObject(const char *ptr, size_t len) {
+    // 当创建的字符串长度大于44，创建EmbeddedString
     if (len <= OBJ_ENCODING_EMBSTR_SIZE_LIMIT)
         return createEmbeddedStringObject(ptr,len);
     else
+        // 否则创建RawString
         return createRawStringObject(ptr,len);
 }
 
@@ -420,6 +429,7 @@ int isObjectRepresentableAsLongLong(robj *o, long long *llval) {
  * string. This happens because SDS strings tend to overallocate to avoid
  * wasting too much time in allocations when appending to the string. */
 void trimStringObjectIfNeeded(robj *o) {
+    // 如果编码类型为RAW，且剩余空间 大于 总长度的 1/10，进行空间回收
     if (o->encoding == OBJ_ENCODING_RAW &&
         sdsavail(o->ptr) > sdslen(o->ptr)/10)
     {
@@ -427,7 +437,9 @@ void trimStringObjectIfNeeded(robj *o) {
     }
 }
 
-/* Try to encode a string object in order to save space */
+/* Try to encode a string object in order to save space
+ * 尝试编码一个字符串对象，去保存空格
+ */
 robj *tryObjectEncoding(robj *o) {
     long value;
     sds s = o->ptr;
@@ -442,11 +454,13 @@ robj *tryObjectEncoding(robj *o) {
     /* We try some specialized encoding only for objects that are
      * RAW or EMBSTR encoded, in other words objects that are still
      * in represented by an actually array of chars. */
+     // 只有 RAW 和 EMBSTR 两种
     if (!sdsEncodedObject(o)) return o;
 
     /* It's not safe to encode shared objects: shared objects can be shared
      * everywhere in the "object space" of Redis and may end in places where
      * they are not handled. We handle them only as values in the keyspace. */
+     // 保证线程安全
      if (o->refcount > 1) return o;
 
     /* Check if we can represent this string as a long integer.
@@ -483,6 +497,7 @@ robj *tryObjectEncoding(robj *o) {
      * try the EMBSTR encoding which is more efficient.
      * In this representation the object and the SDS string are allocated
      * in the same chunk of memory to save space and cache misses. */
+     // 44
     if (len <= OBJ_ENCODING_EMBSTR_SIZE_LIMIT) {
         robj *emb;
 
@@ -501,6 +516,7 @@ robj *tryObjectEncoding(robj *o) {
      * We do that only for relatively large strings as this branch
      * is only entered if the length of the string is greater than
      * OBJ_ENCODING_EMBSTR_SIZE_LIMIT. */
+     // 去空格
     trimStringObjectIfNeeded(o);
 
     /* Return the original object. */
@@ -737,6 +753,7 @@ int getLongFromObjectOrReply(client *c, robj *o, long *target, const char *msg) 
     return C_OK;
 }
 
+// 判断不同的对象存储格式
 char *strEncoding(int encoding) {
     switch(encoding) {
     case OBJ_ENCODING_RAW: return "raw";
