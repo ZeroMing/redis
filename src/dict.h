@@ -55,11 +55,12 @@ typedef struct dictEntry {
         int64_t s64;
         double d;
     } v;
-    /* 链表，下一个节点 */
+     /* 指向下一个节点, 链接表的方式解决Hash冲突 */
     struct dictEntry *next;
 } dictEntry;
 
 
+/* 存储不同数据类型对应不同操作的回调函数 */
 typedef struct dictType {
     uint64_t (*hashFunction)(const void *key);
     void *(*keyDup)(void *privdata, const void *key);
@@ -74,15 +75,20 @@ typedef struct dictType {
  * 每个字典都有两个哈希表结构。用来实现增长的再哈希，从旧的哈希表复制到新的哈希表
  */
 typedef struct dictht {
+	/* dictEntry*数组,Hash表 */
     dictEntry **table;
+	/* Hash表总大小 */
     unsigned long size;
+	/* 计算在table中索引的掩码, 值是size-1 */
     unsigned long sizemask;
+	/* Hash表已使用的大小 */
     unsigned long used;
 } dictht;
 
 typedef struct dict {
     dictType *type;
     void *privdata;
+	// 每个字典都有两个哈希表结构。用来实现增长的再哈希，从旧的哈希表复制到新的哈希表。渐进式hash
     dictht ht[2];
     long rehashidx; /* rehashing not in progress if rehashidx == -1 */
     unsigned long iterators; /* number of iterators currently running */

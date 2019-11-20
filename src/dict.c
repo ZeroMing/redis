@@ -111,8 +111,9 @@ static void _dictReset(dictht *ht)
 dict *dictCreate(dictType *type,
         void *privDataPtr)
 {
+	// 申请内存
     dict *d = zmalloc(sizeof(*d));
-
+	// 初始化
     _dictInit(d,type,privDataPtr);
     return d;
 }
@@ -121,10 +122,12 @@ dict *dictCreate(dictType *type,
 int _dictInit(dict *d, dictType *type,
         void *privDataPtr)
 {
+	// 重置两个Hash表
     _dictReset(&d->ht[0]);
     _dictReset(&d->ht[1]);
     d->type = type;
     d->privdata = privDataPtr;
+	// rehash的索引, -1表示没有进行rehash 
     d->rehashidx = -1;
     d->iterators = 0;
     return DICT_OK;
@@ -157,6 +160,7 @@ int dictExpand(dict *d, unsigned long size)
     /* Rehashing to the same table size is not useful. */
     if (realsize == d->ht[0].size) return DICT_ERR;
 
+	// 申请新的Hash表，初始化所有的指针为空
     /* Allocate the new hash table and initialize all pointers to NULL */
     n.size = realsize;
     n.sizemask = realsize-1;
@@ -171,6 +175,7 @@ int dictExpand(dict *d, unsigned long size)
     }
 
     /* Prepare a second hash table for incremental rehashing */
+	// 准备第二个Hash表，用于渐进式rehash
     d->ht[1] = n;
     d->rehashidx = 0;
     return DICT_OK;
@@ -264,6 +269,7 @@ static void _dictRehashStep(dict *d) {
 /* Add an element to the target hash table */
 int dictAdd(dict *d, void *key, void *val)
 {
+	// 添加到Hash表
     dictEntry *entry = dictAddRaw(d,key,NULL);
 
     if (!entry) return DICT_ERR;
@@ -942,6 +948,7 @@ unsigned long dictScan(dict *d,
 
 /* ------------------------- private functions ------------------------------ */
 
+// 如果有需要进行扩容
 /* Expand the hash table if needed */
 static int _dictExpandIfNeeded(dict *d)
 {
@@ -958,7 +965,8 @@ static int _dictExpandIfNeeded(dict *d)
     if (d->ht[0].used >= d->ht[0].size &&
         (dict_can_resize ||
          d->ht[0].used/d->ht[0].size > dict_force_resize_ratio))
-    {
+    {	 
+    	// 扩大至两倍容量
         return dictExpand(d, d->ht[0].used*2);
     }
     return DICT_OK;
@@ -990,6 +998,7 @@ static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **e
     dictEntry *he;
     if (existing) *existing = NULL;
 
+	// 检查是否需要扩容
     /* Expand the hash table if needed */
     if (_dictExpandIfNeeded(d) == DICT_ERR)
         return -1;

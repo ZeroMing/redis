@@ -1,5 +1,5 @@
 /* adlist.h - A generic doubly linked list implementation
- *
+ * 一个通用的双链表实现
  * Copyright (c) 2006-2012, Salvatore Sanfilippo <antirez at gmail dot com>
  * All rights reserved.
  *
@@ -34,13 +34,18 @@
 /* Node, List, and Iterator are the only data structures used currently. */
 
 typedef struct listNode {
+	// 前驱指针
     struct listNode *prev;
+	// 后继指针
     struct listNode *next;
+	// 值
     void *value;
 } listNode;
 
 typedef struct listIter {
-    listNode *next;
+	// 迭代指针
+	listNode *next;
+	// 迭代方向
     int direction;
 } listIter;
 
@@ -49,9 +54,13 @@ typedef struct list {
     listNode *head;
     /* 尾节点 */
     listNode *tail;
+	// 节点值复制函数
     void *(*dup)(void *ptr);
+	// 节点值释放函数
     void (*free)(void *ptr);
+	// 节点值对比函数
     int (*match)(void *ptr, void *key);
+	// 链表长度
     unsigned long len;
 } list;
 

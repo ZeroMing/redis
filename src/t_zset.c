@@ -1313,8 +1313,11 @@ int zsetScore(robj *zobj, sds member, double *score) {
  * it if needed. */
 int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
     /* Turn options into simple to check vars. */
-    int incr = (*flags & ZADD_INCR) != 0;
+	// 递增元素的分数
+	int incr = (*flags & ZADD_INCR) != 0;
+	// 元素不存在的时候，才会触发
     int nx = (*flags & ZADD_NX) != 0;
+	// 元素存在的时候，才会触发
     int xx = (*flags & ZADD_XX) != 0;
     *flags = 0; /* We'll return our response flags. */
     double curscore;
@@ -1326,6 +1329,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
     }
 
     /* Update the sorted set according to its encoding. */
+	// 压缩列表编码
     if (zobj->encoding == OBJ_ENCODING_ZIPLIST) {
         unsigned char *eptr;
 
@@ -1337,6 +1341,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             }
 
             /* Prepare the score for the increment if needed. */
+			// ZINCRYBY 命令时使用
             if (incr) {
                 score += curscore;
                 if (isnan(score)) {
@@ -1348,8 +1353,10 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
 
             /* Remove and re-insert when score changed. */
             if (score != curscore) {
+				// 删除旧元素
                 zobj->ptr = zzlDelete(zobj->ptr,eptr);
-                zobj->ptr = zzlInsert(zobj->ptr,ele,score);
+				// 插入新元素
+				zobj->ptr = zzlInsert(zobj->ptr,ele,score);
                 *flags |= ZADD_UPDATED;
             }
             return 1;
@@ -1359,6 +1366,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             zobj->ptr = zzlInsert(zobj->ptr,ele,score);
             if (zzlLength(zobj->ptr) > server.zset_max_ziplist_entries ||
                 sdslen(ele) > server.zset_max_ziplist_value)
+                // 判断长度大于128，转换为 跳跃表编码
                 zsetConvert(zobj,OBJ_ENCODING_SKIPLIST);
             if (newscore) *newscore = score;
             *flags |= ZADD_ADDED;
@@ -1367,12 +1375,15 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             *flags |= ZADD_NOP;
             return 1;
         }
-    } else if (zobj->encoding == OBJ_ENCODING_SKIPLIST) {
+    } 
+	// 跳跃列表编码
+	else if (zobj->encoding == OBJ_ENCODING_SKIPLIST) {
         zset *zs = zobj->ptr;
         zskiplistNode *znode;
         dictEntry *de;
-
+		// 查询是否存在值
         de = dictFind(zs->dict,ele);
+		
         if (de != NULL) {
             /* NX? Return, same element already exists. */
             if (nx) {
@@ -1382,6 +1393,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             curscore = *(double*)dictGetVal(de);
 
             /* Prepare the score for the increment if needed. */
+			// ZINCRYBY 命令时使用
             if (incr) {
                 score += curscore;
                 if (isnan(score)) {
@@ -1393,6 +1405,7 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
 
             /* Remove and re-insert when score changes. */
             if (score != curscore) {
+				// 更新分数。先删除旧的，插入新的
                 znode = zslUpdateScore(zs->zsl,curscore,ele,score);
                 /* Note that we did not removed the original element from
                  * the hash table representing the sorted set, so we just
@@ -1403,7 +1416,9 @@ int zsetAdd(robj *zobj, double score, sds ele, int *flags, double *newscore) {
             return 1;
         } else if (!xx) {
             ele = sdsdup(ele);
+			// 直接插入跳表
             znode = zslInsert(zs->zsl,score,ele);
+			// 插入dict
             serverAssert(dictAdd(zs->dict,ele,&znode->score) == DICT_OK);
             *flags |= ZADD_ADDED;
             if (newscore) *newscore = score;
@@ -1530,8 +1545,10 @@ long zsetRank(robj *zobj, sds ele, int reverse) {
 
 /* This generic command implements both ZADD and ZINCRBY. */
 void zaddGenericCommand(client *c, int flags) {
+	
     static char *nanerr = "resulting score is not a number (NaN)";
-    robj *key = c->argv[1];
+	// zset的key
+	robj *key = c->argv[1];
     robj *zobj;
     sds ele;
     double score = 0, *scores = NULL;
@@ -1596,6 +1613,7 @@ void zaddGenericCommand(client *c, int flags) {
     }
 
     /* Lookup the key and create the sorted set if does not exist. */
+	// 查询是否存在集合
     zobj = lookupKeyWrite(c->db,key);
     if (zobj == NULL) {
         if (xx) goto reply_to_client; /* No key + XX option: nothing to do. */
@@ -1608,6 +1626,7 @@ void zaddGenericCommand(client *c, int flags) {
         }
         dbAdd(c->db,key,zobj);
     } else {
+		// 判断编码格式
         if (zobj->type != OBJ_ZSET) {
             addReply(c,shared.wrongtypeerr);
             goto cleanup;

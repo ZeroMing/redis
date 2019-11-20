@@ -44,11 +44,17 @@
 typedef struct quicklistNode {
     struct quicklistNode *prev;
     struct quicklistNode *next;
+	// 数据指针，如果没有被压缩，就指向ziplist结构，反之指向quicklistLZF结构
     unsigned char *zl;
+	// 表示指向ziplist结构的总长度(内存占用长度)
     unsigned int sz;             /* ziplist size in bytes */
+	// 压缩列表内元素的个数
     unsigned int count : 16;     /* count of items in ziplist */
+	// 编码方式，1--ziplist，2--quicklistLZF
     unsigned int encoding : 2;   /* RAW==1 or LZF==2 */
+	// 预留字段，存放数据的方式，1--NONE，2--ziplist
     unsigned int container : 2;  /* NONE==1 or ZIPLIST==2 */
+	// 解压标记，当查看一个被压缩的数据时，需要暂时解压，标记此参数为1，之后再重新进行压缩 
     unsigned int recompress : 1; /* was this node previous compressed? */
     unsigned int attempted_compress : 1; /* node can't compress; too small */
     unsigned int extra : 10; /* more bits to steal for future usage */

@@ -40,6 +40,7 @@ void sunionDiffGenericCommand(client *c, robj **setkeys, int setnum,
  * an integer-encodable value, an intset will be returned. Otherwise a regular
  * hash table. */
 robj *setTypeCreate(sds value) {
+	// 是否可以转换为int
     if (isSdsRepresentableAsLongLong(value,NULL) == C_OK)
         return createIntsetObject();
     return createSetObject();
@@ -51,6 +52,7 @@ robj *setTypeCreate(sds value) {
  * returned, otherwise the new element is added and 1 is returned. */
 int setTypeAdd(robj *subject, sds value) {
     long long llval;
+	// 如果是hashTable编码类型，直接插入，按Redis的hashTable的插入方式
     if (subject->encoding == OBJ_ENCODING_HT) {
         dict *ht = subject->ptr;
         dictEntry *de = dictAddRaw(ht,value,NULL);
@@ -59,13 +61,19 @@ int setTypeAdd(robj *subject, sds value) {
             dictSetVal(ht,de,NULL);
             return 1;
         }
-    } else if (subject->encoding == OBJ_ENCODING_INTSET) {
+		
+    } 
+	// 如果编码类型为 intset
+	else if (subject->encoding == OBJ_ENCODING_INTSET) {
+    	// 如果对象的值可以编码为整数的话，那么将对象的值添加到 intset 中
         if (isSdsRepresentableAsLongLong(value,&llval) == C_OK) {
             uint8_t success = 0;
             subject->ptr = intsetAdd(subject->ptr,llval,&success);
             if (success) {
                 /* Convert to regular set when the intset contains
                  * too many entries. */
+                // 添加成功
+                // 检查集合在添加新元素之后是否需要转换为字典，集合长度大于 512需要转换为hash表
                 if (intsetLen(subject->ptr) > server.set_max_intset_entries)
                     setTypeConvert(subject,OBJ_ENCODING_HT);
                 return 1;
@@ -264,26 +272,33 @@ void setTypeConvert(robj *setobj, int enc) {
 void saddCommand(client *c) {
     robj *set;
     int j, added = 0;
-
+	// 取出指定Key名的集合对象
     set = lookupKeyWrite(c->db,c->argv[1]);
     if (set == NULL) {
+		// 创建新的set对象
         set = setTypeCreate(c->argv[2]->ptr);
         dbAdd(c->db,c->argv[1],set);
     } else {
+		// 判断编码类型
         if (set->type != OBJ_SET) {
             addReply(c,shared.wrongtypeerr);
             return;
         }
     }
-
+	// 遍历插入
     for (j = 2; j < c->argc; j++) {
+		 // 只有元素未存在于集合时，才算一次成功添加
         if (setTypeAdd(set,c->argv[j]->ptr)) added++;
     }
+	// 如果有至少一个元素被成功添加，那么执行以下程序
     if (added) {
+		// 发送键修改信号
         signalModifiedKey(c->db,c->argv[1]);
+		// 发送事件通知
         notifyKeyspaceEvent(NOTIFY_SET,"sadd",c->argv[1],c->db->id);
     }
     server.dirty += added;
+	// 返回添加元素的数量
     addReplyLongLong(c,added);
 }
 

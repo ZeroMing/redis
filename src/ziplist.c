@@ -14,7 +14,7 @@
  * The general layout of the ziplist is as follows:
  *
  * <zlbytes> <zltail> <zllen> <entry> <entry> ... <entry> <zlend>
- *
+ * 
  * NOTE: all fields are stored in little endian, if not specified otherwise.
  *
  * <uint32_t zlbytes> is an unsigned integer to hold the number of bytes that
@@ -269,9 +269,12 @@
  * Note that this is not how the data is actually encoded, is just what we
  * get filled by a function in order to operate more easily. */
 typedef struct zlentry {
+	 /*前一个元素长度需要空间和前一个元素长度*/
     unsigned int prevrawlensize; /* Bytes used to encode the previous entry len*/
     unsigned int prevrawlen;     /* Previous entry len. */
-    unsigned int lensize;        /* Bytes used to encode this entry type/len.
+
+	/*元素长度需要空间和元素长度*/
+	unsigned int lensize;        /* Bytes used to encode this entry type/len.
                                     For example strings have a 1, 2 or 5 bytes
                                     header. Integers always use a single byte.*/
     unsigned int len;            /* Bytes used to represent the actual entry.
@@ -279,14 +282,19 @@ typedef struct zlentry {
                                     while for integers it is 1, 2, 3, 4, 8 or
                                     0 (for 4 bit immediate) depending on the
                                     number range. */
+	/*头部长度即prevrawlensize + lensize*/
     unsigned int headersize;     /* prevrawlensize + lensize. */
+	/*元素内容编码*/					
     unsigned char encoding;      /* Set to ZIP_STR_* or ZIP_INT_* depending on
                                     the entry encoding. However for 4 bits
                                     immediate integers this can assume a range
                                     of values and must be range-checked. */
+     /*元素实际内容*/
     unsigned char *p;            /* Pointer to the very start of the entry, that
                                     is, this points to prev-entry-len field. */
 } zlentry;
+
+
 
 #define ZIPLIST_ENTRY_ZERO(zle) { \
     (zle)->prevrawlensize = (zle)->prevrawlen = 0; \
