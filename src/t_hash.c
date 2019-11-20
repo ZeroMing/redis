@@ -47,7 +47,7 @@ void hashTypeTryConversion(robj *o, robj **argv, int start, int end) {
             sdslen(argv[i]->ptr) > server.hash_max_ziplist_value)
         {
         	// 将对象的编码转换成 REDIS_ENCODING_HT
-            hashTypeConverthashTypeConvert(o, OBJ_ENCODING_HT);
+            hashTypeConvert(o, OBJ_ENCODING_HT);
             break;
         }
     }
@@ -200,6 +200,16 @@ int hashTypeExists(robj *o, sds field) {
 #define HASH_SET_TAKE_FIELD (1<<0)
 #define HASH_SET_TAKE_VALUE (1<<1)
 #define HASH_SET_COPY 0
+/* 
+ * 将给定的 field-value 对添加到 hash 中，
+ * 如果 field 已经存在，那么删除旧的值，并关联新值。
+ *
+ * 这个函数负责对 field 和 value 参数进行引用计数自增。
+ *
+ * 返回 0 表示元素已经存在，这次函数调用执行的是更新操作。
+ *
+ * 返回 1 则表示函数执行的是新添加操作。
+ */
 int hashTypeSet(robj *o, sds field, sds value, int flags) {
     int update = 0;
 
@@ -238,7 +248,9 @@ int hashTypeSet(robj *o, sds field, sds value, int flags) {
         /* Check if the ziplist needs to be converted to a hash table */
         if (hashTypeLength(o) > server.hash_max_ziplist_entries)
             hashTypeConvert(o, OBJ_ENCODING_HT);
-    } else if (o->encoding == OBJ_ENCODING_HT) {
+    } 
+
+		else if (o->encoding == OBJ_ENCODING_HT) {
         dictEntry *de = dictFind(o->ptr,field);
         if (de) {
             sdsfree(dictGetVal(de));
@@ -529,6 +541,7 @@ void hsetnxCommand(client *c) {
     }
 }
 
+// hset 命令
 void hsetCommand(client *c) {
     int i, created = 0;
     robj *o;
